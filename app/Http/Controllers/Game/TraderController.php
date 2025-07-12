@@ -8,6 +8,8 @@ use App\Libraries\Functions;
 use App\Libraries\Game\ResourceMarket;
 use App\Libraries\Users;
 use App\Models\Game\Trader;
+use App\Models\Game\Auction;
+
 
 class TraderController extends BaseController
 {
@@ -22,37 +24,65 @@ class TraderController extends BaseController
     public function __construct()
     {
         parent::__construct();
-
-        // check if session is active
         Users::checkSession();
-
-        // load Language
         parent::loadLang(['game/global', 'game/trader']);
-
         $this->traderModel = new Trader();
-
-        // init a new trader object
         $this->setUpTrader();
     }
 
     public function index(): void
     {
-        // Check module access
+        // Handle AJAX module loading
+        if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
+            $mode = $_GET['mode'] ?? '';
+
+            switch ($mode) {
+                case 'traderResources':
+                    echo $this->template->set(
+                        'game/trader_resources_view',
+                        array_merge(
+                            $this->langs->language,
+                            ['list_of_resources' => $this->buildResourcesSection()]
+                        )
+                    );
+                    exit;
+
+                case 'traderAuctioneer':
+					$auctionModel = new Auction();
+					$auction = $auctionModel->getCurrentAuction();
+					$bidHistory = $auction ? $auctionModel->getBidHistory($auction->id) : [];
+
+					echo $this->template->set('game/trader_auctioneer_view', array_merge(
+						$this->langs->language,
+						[
+							'auction' => $auction,
+							'bidHistory' => $bidHistory,
+						]
+					));
+					exit;
+
+
+                case 'traderScrap':
+                    echo $this->template->set('game/trader_scrap_view', $this->langs->language);
+                    exit;
+
+                case 'traderImportExport':
+                    echo $this->template->set('game/trader_import_export_view', $this->langs->language);
+                    exit;
+
+                default:
+                    http_response_code(404);
+                    echo 'Invalid trader mode';
+                    exit;
+            }
+        }
+
+        // Standard flow
         Functions::moduleMessage(Functions::isModuleAccesible(self::MODULE_ID));
-
-        // time to do something
         $this->runAction();
-
-        // build the page
         $this->buildPage();
     }
 
-    /**
-     * Creates a new trader object that will handle all the trader
-     * creation methods and actions
-     *
-     * @return void
-     */
     private function setUpTrader(): void
     {
         $this->trader = new ResourceMarket(
@@ -61,34 +91,37 @@ class TraderController extends BaseController
         );
     }
 
-    /**
-     * Run an action
-     *
-     * @return void
-     */
     private function runAction(): void
-    {
-        $refill = filter_input_array(INPUT_POST);
-
-        if ($refill) {
-            if (
-                preg_match_all(
-                    '/(' . join('|', self::RESOURCES) . ')-(' . join('|', self::PERCENTAGES) . ')/',
-                    key($refill)
-                )
-            ) {
-                $this->refillResource(...explode('-', key($refill)));
-            }
+{
+    $post = filter_input_array(INPUT_POST);
+    if ($post) {
+        // Resource refill check
+        if (preg_match_all('/(' . join('|', self::RESOURCES) . ')-(' . join('|', self::PERCENTAGES) . ')/', key($post))) {
+            $this->refillResource(...explode('-', key($post)));
+        }
+        // Auction bid check
+        elseif (isset($post['auction_bid'], $post['auction_id'])) {
+            $this->placeAuctionBid((int)$post['auction_id'], (int)$post['auction_bid']);
         }
     }
+}
+private function placeAuctionBid(int $auctionId, int $bidAmount): void
+{
+    $auctionModel = new \App\Models\Game\Auction();
 
-    /**
-     * Refill resources
-     *
-     * @param string $resource
-     * @param integer $percentage
-     * @return void
-     */
+    $userId = $this->user['user_id'];
+
+    $result = $auctionModel->placeBid($userId, $auctionId, $bidAmount);
+
+    if ($result === true) {
+        // Success: redirect back to auction tab
+        Functions::redirect('game.php?page=traderOverview&tab=traderAuctioneer');
+    } else {
+        $this->error = $result;
+    }
+}
+
+
     private function refillResource(string $resource, int $percentage): void
     {
         if ($this->trader->{'is' . $resource . 'StorageFillable'}($percentage)) {
@@ -101,7 +134,8 @@ class TraderController extends BaseController
                     $this->planet['planet_id']
                 );
 
-                Functions::redirect('game.php?page=traderResources');
+                Functions::redirect('game.php?page=traderOverview&tab=traderResources');
+
             } else {
                 $this->error = $this->langs->line('tr_no_enough_dark_matter');
             }
@@ -124,11 +158,6 @@ class TraderController extends BaseController
         );
     }
 
-    /**
-     * Display the message block
-     *
-     * @return array
-     */
     private function setMessageDisplay(): array
     {
         $message = [
@@ -147,31 +176,11 @@ class TraderController extends BaseController
         return $message;
     }
 
-    /**
-     * Get the kind of trader that we are requesting
-     *
-     * @return array
-     */
     private function getPage(): array
     {
-        return [
-            'current_mode' => $this->template->set(
-                'game/trader_resources_view',
-                array_merge(
-                    $this->langs->language,
-                    [
-                        'list_of_resources' => $this->buildResourcesSection(),
-                    ]
-                )
-            ),
-        ];
+        return []; // The overview view handles AJAX loading dynamically
     }
 
-    /**
-     * Build resources section
-     *
-     * @return array
-     */
     private function buildResourcesSection(): array
     {
         $list_of_resources = [];
@@ -193,12 +202,6 @@ class TraderController extends BaseController
         return $list_of_resources;
     }
 
-    /**
-     * Set the different refill options
-     *
-     * @param string $resource
-     * @return array
-     */
     private function setRefillOptions(string $resource): array
     {
         $refillOptions = [];
@@ -221,7 +224,7 @@ class TraderController extends BaseController
             }
 
             $refillOptions[] = [
-                'label' => (self::PERCENTAGES == 100) ? $this->langs->line('tr_refill_to') : $this->langs->line('tr_refill_by'),
+                'label' => $this->langs->line('tr_refill_by'),
                 'percentage' => $percentage,
                 'tr_requires' => $this->langs->line('tr_requires'),
                 'price' => $price,
