@@ -31,6 +31,31 @@ $lang = [
     'tr_no_enough_dark_matter' => 'There is not enough dark matter available',
 
     // traderAuctioneer
+	'tr_auction_title' => 'Auctioneer',
+	'tr_auction_no_active' => 'No active auctions at the moment.',
+	'tr_auction_item' => 'Auction Item',
+	'tr_auction_type' => 'Type',
+	'tr_auction_rarity' => 'Rarity',
+	'tr_auction_base_price' => 'Base Price',
+	'tr_auction_current_bid' => 'Current Highest Bid',
+	'tr_auction_ends' => 'Auction Ends',
+	'tr_auction_place_bid' => 'Place Bid',
+	'tr_auction_your_bid' => 'Your Bid',
+	'tr_auction_bid_history' => 'Bid History',
+	'tr_auction_bid_format' => 'User #%s bid %s on %s',
+	'tr_auction_bid_success' => 'Your bid was placed successfully.',
+	'tr_auction_bid_too_low' => 'Your bid must be higher than the current bid.',
+	'tr_auction_expired' => 'This auction has already ended.',
+	'tr_auction_already_winning' => 'You are already the highest bidder.',
+	'tr_auction_claim_button' => 'Claim Reward',
+	'tr_auction_claim_success' => 'You have successfully claimed your reward!',
+	'tr_auction_claim_failed' => 'You are not eligible to claim this auction.',
+	'tr_auction_not_found' => 'Auction not found.',
+	'tr_auction_error_generic' => 'An error occurred while processing your request.',
+	'tr_auction_resource_reward' => 'You received: %s %s.',
+	'tr_auction_ship_reward' => 'Ship %s x%d has been added to your fleet!',
+	'tr_auction_end_notice' => 'Auction has ended. Winner: User #%s',
+
 
     // traderScrap
     'tr_scrap_hello' => 'Then let\'s see what you\'re willing to give out.',
